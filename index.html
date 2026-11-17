@@ -56,6 +56,13 @@ button:focus-visible,select:focus-visible,.swap:focus-visible{outline:3px solid 
 .prog{height:4px;border-radius:4px;background:var(--line);margin-top:6px;overflow:hidden}
 .prog i{display:block;height:100%;width:0;background:var(--acc);transition:width .2s}
 .orig{margin:-2px 0 10px;font-size:14px;color:var(--mute)}.orig summary{cursor:pointer;padding:4px 0}.orig p{white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0 0;padding:10px;border-radius:10px;background:var(--panel2);color:var(--ink);max-height:220px;overflow:auto}
+.pins{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+.pins small{color:var(--mute);font-size:13px;margin-right:2px}
+.pin{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;background:var(--panel2)}
+.pin button{border:0;background:transparent;min-height:40px;border-radius:999px;font-weight:500;font-size:15px;padding:0 4px 0 14px}
+.pin .x{padding:0 12px 0 6px;color:var(--mute);font-size:18px;line-height:1}
+.pin.on{background:var(--acc);border-color:var(--acc)}.pin.on button{color:#fff}
+.pinadd{min-height:40px;border-radius:999px;border-style:dashed;font-weight:500;font-size:15px;padding:0 14px;color:var(--mute)}
 #file{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 #status{padding:0 14px 14px;font-size:14px;color:var(--acc);min-height:6px}
 .recent{padding:36px 0 56px}
@@ -84,6 +91,7 @@ footer{font-size:13px;color:var(--mute);padding-bottom:32px}
       <button class="swap" id="swap" aria-label="Swap languages" title="Swap languages">⇄</button>
       <select id="to" aria-label="Translate to"></select>
     </div>
+    <div class="pins" id="pins" aria-label="Pinned languages"></div>
     <div class="pages">
       <div class="page" id="srcPage">
         <div class="shot" id="shot">
@@ -304,7 +312,24 @@ const pg=$("srcPage");
 pg.addEventListener("drop",e=>{const f=[...(e.dataTransfer?.files||[])].find(f=>/^image\//.test(f.type));if(f)handleImage(f)});
 document.addEventListener("paste",e=>{const it=[...(e.clipboardData?.items||[])].find(i=>/^image\//.test(i.type));if(it){e.preventDefault();handleImage(it.getAsFile())}});
 
-renderHist();count();
+/* ---------- pinned languages ---------- */
+let pins=store.get("tr_pins",["en","es","ru"]).filter(c=>LANGS.some(l=>l[0]===c&&c!=="auto"));
+function renderPins(){
+  const to=$("to").value;
+  $("pins").innerHTML=`<small>Pinned</small>`+pins.map(c=>`<span class="pin${c===to?" on":""}"><button data-pick="${c}" aria-pressed="${c===to}">${esc(name(c))}</button><button class="x" data-unpin="${c}" aria-label="Unpin ${esc(name(c))}" title="Unpin">×</button></span>`).join("")+(pins.includes(to)?"":`<button class="pinadd" data-add="${to}">+ Pin ${esc(name(to))}</button>`);
+}
+$("pins").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.pick){if($("to").value!==b.dataset.pick){$("to").value=b.dataset.pick;store.set("tr_to",b.dataset.pick);session=false;translate(true)}}
+  else if(b.dataset.unpin)pins=pins.filter(c=>c!==b.dataset.unpin);
+  else if(b.dataset.add&&!pins.includes(b.dataset.add))pins.push(b.dataset.add);
+  store.set("tr_pins",pins);renderPins();
+});
+["to","from"].forEach(id=>$(id).addEventListener("change",renderPins));
+$("swap").addEventListener("click",renderPins);
+$("list").addEventListener("click",renderPins);
+
+renderPins();renderHist();count();
 }
 </script>
 </body>
