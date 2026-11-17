@@ -55,6 +55,7 @@ button:focus-visible,select:focus-visible,.swap:focus-visible{outline:3px solid 
 .shot button{min-height:40px;padding:0 12px;font-size:14px}
 .prog{height:4px;border-radius:4px;background:var(--line);margin-top:6px;overflow:hidden}
 .prog i{display:block;height:100%;width:0;background:var(--acc);transition:width .2s}
+.orig{margin:-2px 0 10px;font-size:14px;color:var(--mute)}.orig summary{cursor:pointer;padding:4px 0}.orig p{white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0 0;padding:10px;border-radius:10px;background:var(--panel2);color:var(--ink);max-height:220px;overflow:auto}
 #file{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 #status{padding:0 14px 14px;font-size:14px;color:var(--acc);min-height:6px}
 .recent{padding:36px 0 56px}
@@ -90,6 +91,7 @@ footer{font-size:13px;color:var(--mute);padding-bottom:32px}
           <div><b id="shotName">image</b><span id="shotMsg">Reading text...</span><div class="prog"><i id="bar"></i></div></div>
           <button id="shotX" aria-label="Remove image">Remove</button>
         </div>
+        <details class="orig" id="origBox" hidden><summary>Text found in image</summary><p id="orig"></p></details>
         <textarea id="src" placeholder="Enter text to translate" aria-label="Text to translate"></textarea>
         <div class="meta"><span id="count">0 characters</span><span id="det"></span></div>
       </div>
@@ -172,9 +174,9 @@ async function viaApi(text,from,to){
 }
 
 let seq=0,timer=null,session=false;
-async function translate(auto){
+async function translate(auto,srcText){
   clearTimeout(timer);
-  const text=$("src").value.trim();
+  const text=(srcText!=null?srcText:$("src").value).trim();
   if(!text){if(ctrl)ctrl.abort();seq++;if(auto){setOut("Translation shows up here",true);$("det").textContent="";$("outLang").textContent=""}else status("Type something to translate first.");return}
   const from=$("from").value,to=$("to").value;
   if(from===to){setOut(text);$("outLang").textContent=name(to);return}
@@ -276,14 +278,16 @@ async function handleImage(file){
   imgBusy=true;status("");$("up").disabled=true;
   if(thumbUrl)URL.revokeObjectURL(thumbUrl);
   thumbUrl=URL.createObjectURL(file);
-  $("thumb").src=thumbUrl;$("shotName").textContent=file.name||"Pasted image";$("shot").classList.add("on");shotMsg("Preparing image...",.02);
+  $("origBox").hidden=true;$("thumb").src=thumbUrl;$("shotName").textContent=file.name||"Pasted image";$("shot").classList.add("on");shotMsg("Preparing image...",.02);
   try{
     const blob=await shrink(file);
     let text=sample?await readWithClaude(blob):await readWithTesseract(blob);
     if(!text||text==="NO_TEXT"){shotMsg("No text found in this image.",0);return}
-    $("src").value=text;count();shotMsg("Text found. Translating...",1);
-    await translate();
-    shotMsg("Done. You can edit the text and translate again.",1);
+    $("orig").textContent=text;$("origBox").hidden=false;$("origBox").open=false;
+    shotMsg("Text found. Translating...",1);
+    session=false;
+    await translate(false,text);
+    shotMsg("Translated. Tap \"Text found in image\" to see the original.",1);
   }catch(e){
     shotMsg("Couldn't read this image.",0);
     if(e&&e.code==="rate_limited")status("Too many requests in a row. Wait a minute and try again.");
@@ -293,7 +297,7 @@ async function handleImage(file){
 
 $("up").addEventListener("click",()=>$("file").click());
 $("file").addEventListener("change",e=>handleImage(e.target.files[0]));
-$("shotX").addEventListener("click",()=>{$("shot").classList.remove("on");if(thumbUrl){URL.revokeObjectURL(thumbUrl);thumbUrl=null}$("thumb").removeAttribute("src")});
+$("shotX").addEventListener("click",()=>{$("shot").classList.remove("on");$("origBox").hidden=true;$("orig").textContent="";if(thumbUrl){URL.revokeObjectURL(thumbUrl);thumbUrl=null}$("thumb").removeAttribute("src")});
 const pg=$("srcPage");
 ["dragenter","dragover"].forEach(t=>pg.addEventListener(t,e=>{e.preventDefault();pg.classList.add("drag")}));
 ["dragleave","drop"].forEach(t=>pg.addEventListener(t,e=>{e.preventDefault();pg.classList.remove("drag")}));
