@@ -241,7 +241,7 @@ $("copy").addEventListener("click",async()=>{
   try{await navigator.clipboard.writeText(o.textContent);status("Copied.");setTimeout(()=>status(""),1500)}
   catch(e){const r=document.createRange();r.selectNodeContents(o);const s=getSelection();s.removeAllRanges();s.addRange(r);status("Selected. Press Ctrl + C to copy.")}
 });
-$("clear").addEventListener("click",()=>{clearTimeout(timer);seq++;session=false;busy=false;$("go").textContent="Translate";if(ctrl)ctrl.abort();$("src").value="";setOut("Translation shows up here",true);$("det").textContent="";$("outLang").textContent="";status("");count();$("src").focus()});
+$("clear").addEventListener("click",()=>{$("shotX").click();clearTimeout(timer);seq++;session=false;busy=false;$("go").textContent="Translate";if(ctrl)ctrl.abort();$("src").value="";setOut("Translation shows up here",true);$("det").textContent="";$("outLang").textContent="";status("");count();$("src").focus()});
 $("list").addEventListener("click",e=>{const b=e.target.closest(".item");if(!b)return;const x=store.get("tr_hist",[])[+b.dataset.i];if(!x)return;clearTimeout(timer);seq++;session=false;$("src").value=x.s;setOut(x.t);$("to").value=x.to;count();window.scrollTo({top:0,behavior:"smooth"})});
 /* ---------- image upload ---------- */
 const OCR={en:"eng",es:"spa","pt-BR":"por","pt-PT":"por",fr:"fra",de:"deu",it:"ita",ru:"rus",uk:"ukr",pl:"pol",tl:"tgl","zh-CN":"chi_sim","zh-TW":"chi_tra",ja:"jpn",ko:"kor",vi:"vie",th:"tha",id:"ind",ms:"msa",hi:"hin",ar:"ara",tr:"tur",nl:"nld",sv:"swe",el:"ell",he:"heb",ro:"ron",cs:"ces",hu:"hun",fi:"fin",da:"dan",no:"nor",ht:"hat"};
@@ -290,6 +290,7 @@ async function handleImage(file){
   try{
     const blob=await shrink(file);
     let text=sample?await readWithClaude(blob):await readWithTesseract(blob);
+    if(!$("shot").classList.contains("on"))return;
     if(!text||text==="NO_TEXT"){shotMsg("No text found in this image.",0);return}
     $("orig").textContent=text;$("origBox").hidden=false;$("origBox").open=false;
     shotMsg("Text found. Translating...",1);
