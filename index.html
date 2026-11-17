@@ -104,7 +104,7 @@ footer{font-size:13px;color:var(--mute);padding-bottom:32px}
       <input type="file" id="file" accept="image/*" tabindex="-1">
       <button id="copy">Copy translation</button>
       <button id="clear">Clear</button>
-      <span class="hint">Ctrl + Enter to translate. Drop or paste an image to translate its text.</span>
+      <span class="hint">Translates as you type. Drop or paste an image to translate its text.</span>
     </div>
     <div id="status" role="status"></div>
   </section>
@@ -171,33 +171,42 @@ async function viaApi(text,from,to){
   return {translation:d.translatedText||"",detected:d.detectedLanguage?name(d.detectedLanguage):""};
 }
 
-async function translate(){
+let seq=0,timer=null,session=false;
+async function translate(auto){
+  clearTimeout(timer);
   const text=$("src").value.trim();
-  if(!text){status("Type something to translate first.");return}
-  if(busy)return;
+  if(!text){if(ctrl)ctrl.abort();seq++;if(auto){setOut("Translation shows up here",true);$("det").textContent="";$("outLang").textContent=""}else status("Type something to translate first.");return}
   const from=$("from").value,to=$("to").value;
-  if(from===to){setOut(text);return}
-  busy=true;$("go").disabled=true;$("go").textContent="Translating...";status("");setOut("Translating...",true);$("det").textContent="";
+  if(from===to){setOut(text);$("outLang").textContent=name(to);return}
+  if(ctrl)ctrl.abort();
+  const my=++seq;
+  busy=true;$("go").textContent="Translating...";status("");$("outLang").textContent="Translating...";
+  if($("out").classList.contains("empty"))setOut("Translating...",true);
   try{
     let res;
     if(sample)res=await viaClaude(text,from,to);
     else if(inArtifact)throw new Error("Translation needs you to be signed in to Claude on this page. If you are signed in, refresh and allow it when asked.");
     else res=await viaApi(text,from,to);
+    if(my!==seq)return;
     if(!res.translation)throw new Error("No translation came back. Try again.");
     setOut(res.translation);
     $("outLang").textContent=name(to);
-    if(from==="auto"&&res.detected)$("det").textContent="Detected: "+res.detected;
+    $("det").textContent=from==="auto"&&res.detected?"Detected: "+res.detected:"";
     const h=store.get("tr_hist",[]);
-    h.unshift({s:text,t:res.translation,f:from==="auto"?(res.detected||"Detected"):name(from),to});
+    const item={s:text,t:res.translation,f:from==="auto"?(res.detected||"Detected"):name(from),to};
+    if(auto&&session&&h.length)h[0]=item;else h.unshift(item);
+    session=!!auto;
     store.set("tr_hist",h.slice(0,8));renderHist();
   }catch(e){
-    setOut("Translation shows up here",true);
+    if(my!==seq||(e&&e.name==="AbortError"))return;
+    if($("out").textContent==="Translating...")setOut("Translation shows up here",true);
+    $("outLang").textContent="";
     if(e&&e.code==="not_granted"){sample=null;setMode();status("Translation was not allowed. Refresh and allow it when asked.")}
     else if(e&&e.code==="rate_limited")status("Too many translations in a row. Wait a minute and try again.");
-    else if(e&&e.name==="AbortError")status("");
     else status((e&&e.message)||"Something went wrong. Try again.");
-  }finally{busy=false;$("go").disabled=false;$("go").textContent="Translate"}
+  }finally{if(my===seq){busy=false;$("go").textContent="Translate"}}
 }
+function autoSoon(){clearTimeout(timer);timer=setTimeout(()=>translate(true),sample?600:900)}
 
 function renderHist(){
   const h=store.get("tr_hist",[]);
@@ -205,25 +214,25 @@ function renderHist(){
 }
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 
-$("go").addEventListener("click",translate);
-$("src").addEventListener("input",count);
+$("go").addEventListener("click",()=>{session=false;translate()});
+$("src").addEventListener("input",()=>{count();autoSoon()});
 $("src").addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();translate()}});
-$("from").addEventListener("change",()=>store.set("tr_from",$("from").value));
-$("to").addEventListener("change",()=>store.set("tr_to",$("to").value));
+$("from").addEventListener("change",()=>{store.set("tr_from",$("from").value);session=false;translate(true)});
+$("to").addEventListener("change",()=>{store.set("tr_to",$("to").value);session=false;translate(true)});
 $("swap").addEventListener("click",()=>{
   const f=$("from").value,t=$("to").value,o=$("out");
   if(f!=="auto")$("to").value=f;
   $("from").value=t;
   if(!o.classList.contains("empty")){$("src").value=o.textContent;setOut("Translation shows up here",true);count()}
-  store.set("tr_from",$("from").value);store.set("tr_to",$("to").value);
+  store.set("tr_from",$("from").value);store.set("tr_to",$("to").value);session=false;translate(true);
 });
 $("copy").addEventListener("click",async()=>{
   const o=$("out");if(o.classList.contains("empty")){status("Nothing to copy yet.");return}
   try{await navigator.clipboard.writeText(o.textContent);status("Copied.");setTimeout(()=>status(""),1500)}
   catch(e){const r=document.createRange();r.selectNodeContents(o);const s=getSelection();s.removeAllRanges();s.addRange(r);status("Selected. Press Ctrl + C to copy.")}
 });
-$("clear").addEventListener("click",()=>{if(ctrl)ctrl.abort();$("src").value="";setOut("Translation shows up here",true);$("det").textContent="";$("outLang").textContent="";status("");count();$("src").focus()});
-$("list").addEventListener("click",e=>{const b=e.target.closest(".item");if(!b)return;const x=store.get("tr_hist",[])[+b.dataset.i];if(!x)return;$("src").value=x.s;setOut(x.t);$("to").value=x.to;count();window.scrollTo({top:0,behavior:"smooth"})});
+$("clear").addEventListener("click",()=>{clearTimeout(timer);seq++;session=false;busy=false;$("go").textContent="Translate";if(ctrl)ctrl.abort();$("src").value="";setOut("Translation shows up here",true);$("det").textContent="";$("outLang").textContent="";status("");count();$("src").focus()});
+$("list").addEventListener("click",e=>{const b=e.target.closest(".item");if(!b)return;const x=store.get("tr_hist",[])[+b.dataset.i];if(!x)return;clearTimeout(timer);seq++;session=false;$("src").value=x.s;setOut(x.t);$("to").value=x.to;count();window.scrollTo({top:0,behavior:"smooth"})});
 /* ---------- image upload ---------- */
 const OCR={en:"eng",es:"spa","pt-BR":"por","pt-PT":"por",fr:"fra",de:"deu",it:"ita",ru:"rus",uk:"ukr",pl:"pol",tl:"tgl","zh-CN":"chi_sim","zh-TW":"chi_tra",ja:"jpn",ko:"kor",vi:"vie",th:"tha",id:"ind",ms:"msa",hi:"hin",ar:"ara",tr:"tur",nl:"nld",sv:"swe",el:"ell",he:"heb",ro:"ron",cs:"ces",hu:"hun",fi:"fin",da:"dan",no:"nor",ht:"hat"};
 let imgBusy=false,thumbUrl=null;
