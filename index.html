@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quick Translator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@500;700&family=Red+Hat+Text:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: quick, friendly utility, nothing in the way of typing
+   IDEA: a two-page phrasebook spread laid open on a desk
+   PICTURE: the working translator itself, two facing panels with a swap hinge
+   COLOUR and TYPE: oxford blue band, white panels, magenta for the action; Red Hat Display + Text
+   LAYOUT: title band, translator card overlapping it, recent list below; stacks under 760px */
+:root{color-scheme:light dark;--bg:light-dark(#eef1f8,#070f26);--band:#0b1f4b;--panel:light-dark(#ffffff,#0f1a3a);--panel2:light-dark(#f7f9fd,#0b1533);--ink:light-dark(#0b1f4b,#e8ecf7);--mute:light-dark(#56638a,#9aa6c4);--line:light-dark(#d6dcea,#26335e);--acc:#e0115f;--accd:#b80d4d}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Red Hat Text",system-ui,sans-serif;overflow-x:clip}
+.band{background:var(--band);color:#fff;padding:clamp(28px,4vw,52px) max(5vw,16px) 96px}
+.band .in,.wrap{max-width:1100px;margin:0 auto}
+h1{font:700 clamp(32px,5vw,48px)/1.05 "Red Hat Display",sans-serif;margin:0 0 8px;text-wrap:balance}
+.band p{margin:0;color:#c9d3ee;max-width:60ch}
+.mode{display:inline-flex;align-items:center;gap:8px;margin-top:14px;font-size:14px;color:#dfe5f6;background:rgba(255,255,255,.08);padding:6px 12px;border-radius:999px}
+.mode i{width:8px;height:8px;border-radius:50%;background:#7ce0a8}
+.mode.off i{background:#f5b74a}
+.wrap{padding:0 max(5vw,16px);margin-top:-72px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 18px 40px -20px rgba(11,31,75,.45);overflow:hidden}
+.bar{display:grid;grid-template-columns:minmax(0,1fr) 52px minmax(0,1fr);gap:10px;align-items:center;padding:14px;border-bottom:1px solid var(--line)}
+select{width:100%;font:500 16px "Red Hat Text",sans-serif;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:0 12px;height:46px}
+.swap{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:20px;cursor:pointer;justify-self:center;transition:transform .25s}
+.swap:hover{transform:rotate(180deg)}
+.pages{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.page{position:relative;padding:16px;min-height:280px;display:flex;flex-direction:column}
+.page+.page{border-left:1px solid var(--line);background:var(--panel2)}
+textarea{flex:1;width:100%;min-height:220px;resize:vertical;border:0;background:transparent;color:var(--ink);font:400 18px/1.5 "Red Hat Text",sans-serif;outline:none}
+textarea::placeholder{color:var(--mute)}
+#out{flex:1;font-size:18px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;min-height:220px}
+#out.empty{color:var(--mute)}
+.meta{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--mute);margin-top:8px;flex-wrap:wrap}
+.acts{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px;border-top:1px solid var(--line)}
+button{font:600 16px "Red Hat Text",sans-serif;min-height:46px;padding:0 18px;border-radius:10px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+button.go{background:var(--acc);border-color:var(--acc);color:#fff;padding:0 26px}
+button.go:hover{background:var(--accd)}
+button:disabled{opacity:.55;cursor:wait}
+button:focus-visible,select:focus-visible,.swap:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.hint{margin-left:auto;font-size:13px;color:var(--mute)}
+#status{padding:0 14px 14px;font-size:14px;color:var(--acc);min-height:6px}
+.recent{padding:36px 0 56px}
+h2{font:700 22px/1.2 "Red Hat Display",sans-serif;margin:0 0 12px}
+.list{display:grid;gap:10px}
+.item{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;text-align:left;width:100%;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;font-weight:400;min-height:0}
+.item small{display:block;color:var(--mute);font-size:13px;margin-bottom:2px}
+.item span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.none{color:var(--mute);font-size:15px}
+footer{font-size:13px;color:var(--mute);padding-bottom:32px}
+@media(max-width:760px){.pages{grid-template-columns:minmax(0,1fr)}.page+.page{border-left:0;border-top:1px solid var(--line)}.page{min-height:200px}textarea,#out{min-height:150px}.hint{display:none}.item{grid-template-columns:minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){.swap{transition:none}}
+</style>
+</head>
+<body>
+<header class="band"><div class="in">
+  <h1>Quick Translator</h1>
+  <p>Type or paste text, pick a language, and translate. Slang, names and line breaks are kept as close to the original as possible.</p>
+  <div class="mode off" id="mode"><i></i><span id="modeTxt">Starting up</span></div>
+</div></header>
+
+<main class="wrap">
+  <section class="card">
+    <div class="bar">
+      <select id="from" aria-label="Translate from"></select>
+      <button class="swap" id="swap" aria-label="Swap languages" title="Swap languages">⇄</button>
+      <select id="to" aria-label="Translate to"></select>
+    </div>
+    <div class="pages">
+      <div class="page">
+        <textarea id="src" placeholder="Enter text to translate" aria-label="Text to translate"></textarea>
+        <div class="meta"><span id="count">0 characters</span><span id="det"></span></div>
+      </div>
+      <div class="page">
+        <div id="out" class="empty" aria-live="polite">Translation shows up here</div>
+        <div class="meta"><span id="outLang"></span></div>
+      </div>
+    </div>
+    <div class="acts">
+      <button class="go" id="go">Translate</button>
+      <button id="copy">Copy translation</button>
+      <button id="clear">Clear</button>
+      <span class="hint">Ctrl + Enter to translate</span>
+    </div>
+    <div id="status" role="status"></div>
+  </section>
+
+  <section class="recent">
+    <h2>Recent translations</h2>
+    <div class="list" id="list"></div>
+  </section>
+  <footer>Recent translations are saved only in your own browser.</footer>
+</main>
+
+<script>
+{
+const LANGS=[["auto","Detect language"],["en","English"],["es","Spanish"],["pt-BR","Portuguese (Brazil)"],["pt-PT","Portuguese (Portugal)"],["fr","French"],["de","German"],["it","Italian"],["ru","Russian"],["uk","Ukrainian"],["pl","Polish"],["tl","Filipino (Tagalog)"],["zh-CN","Chinese (Simplified)"],["zh-TW","Chinese (Traditional)"],["ja","Japanese"],["ko","Korean"],["vi","Vietnamese"],["th","Thai"],["id","Indonesian"],["ms","Malay"],["hi","Hindi"],["ar","Arabic"],["tr","Turkish"],["nl","Dutch"],["sv","Swedish"],["el","Greek"],["he","Hebrew"],["ro","Romanian"],["cs","Czech"],["hu","Hungarian"],["fi","Finnish"],["da","Danish"],["no","Norwegian"],["ht","Haitian Creole"]];
+const $=id=>document.getElementById(id);
+const name=c=>(LANGS.find(l=>l[0]===c)||[c,c])[1];
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+$("from").innerHTML=LANGS.map(([c,n])=>`<option value="${c}">${n}</option>`).join("");
+$("to").innerHTML=LANGS.filter(l=>l[0]!=="auto").map(([c,n])=>`<option value="${c}">${n}</option>`).join("");
+$("from").value=store.get("tr_from","auto");
+$("to").value=store.get("tr_to","es");
+
+let sample=null,busy=false,ctrl=null;
+const inArtifact=typeof window.claude!=="undefined"&&window.claude&&typeof window.claude.use==="function";
+
+function setMode(){
+  const m=$("mode");
+  if(sample){m.classList.remove("off");$("modeTxt").textContent="AI translation is on"}
+  else if(inArtifact){m.classList.add("off");$("modeTxt").textContent="Connecting to translation"}
+  else{m.classList.remove("off");$("modeTxt").textContent="Free translation service (up to 500 characters at a time)"}
+}
+setMode();
+if(inArtifact){
+  window.claude.use("sample").then(s=>{sample=s;setMode();if(!s)$("modeTxt").textContent="Sign in to Claude to translate"}).catch(()=>{$("modeTxt").textContent="Sign in to Claude to translate"});
+}
+
+function setOut(t,empty){const o=$("out");o.textContent=t;o.classList.toggle("empty",!!empty)}
+function status(t){$("status").textContent=t||""}
+function count(){const n=$("src").value.length;$("count").textContent=n+(n===1?" character":" characters")}
+
+async function viaClaude(text,from,to){
+  const prompt=`You are a professional translator. Translate the text inside the <text> tags ${from==="auto"?"(first detect what language it is in)":"from "+name(from)} into ${name(to)}.
+Keep the meaning, tone, slang, gaming terms, names, numbers, emoji and line breaks. Do not add notes or explanations.
+Reply with JSON only, in this exact shape: {"detected":"<English name of the source language>","translation":"<the translated text>"}
+<text>
+${text}
+</text>`;
+  ctrl=new AbortController();
+  const r=await sample(prompt,{modelTier:"quick",signal:ctrl.signal,onText:({text:t})=>{const m=t.match(/"translation"\s*:\s*"((?:[^"\\]|\\.)*)/);if(m){try{setOut(JSON.parse('"'+m[1].replace(/\\$/,"")+'"'))}catch(e){}}}});
+  const raw=(r&&r.text)||"";
+  const j=raw.match(/\{[\s\S]*\}/);
+  if(j){try{const v=JSON.parse(j[0]);if(typeof v.translation==="string")return v}catch(e){}}
+  return {translation:raw.trim(),detected:""};
+}
+
+async function viaApi(text,from,to){
+  if(text.length>500)throw new Error("The free service handles up to 500 characters at a time. Try a shorter piece.");
+  const src=from==="auto"?"autodetect":from;
+  const r=await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(src)}|${encodeURIComponent(to)}`);
+  const j=await r.json();
+  if(String(j.responseStatus)!=="200")throw new Error(j.responseDetails||"Translation failed. Try again in a moment.");
+  const d=j.responseData||{};
+  return {translation:d.translatedText||"",detected:d.detectedLanguage?name(d.detectedLanguage):""};
+}
+
+async function translate(){
+  const text=$("src").value.trim();
+  if(!text){status("Type something to translate first.");return}
+  if(busy)return;
+  const from=$("from").value,to=$("to").value;
+  if(from===to){setOut(text);return}
+  busy=true;$("go").disabled=true;$("go").textContent="Translating...";status("");setOut("Translating...",true);$("det").textContent="";
+  try{
+    let res;
+    if(sample)res=await viaClaude(text,from,to);
+    else if(inArtifact)throw new Error("Translation needs you to be signed in to Claude on this page. If you are signed in, refresh and allow it when asked.");
+    else res=await viaApi(text,from,to);
+    if(!res.translation)throw new Error("No translation came back. Try again.");
+    setOut(res.translation);
+    $("outLang").textContent=name(to);
+    if(from==="auto"&&res.detected)$("det").textContent="Detected: "+res.detected;
+    const h=store.get("tr_hist",[]);
+    h.unshift({s:text,t:res.translation,f:from==="auto"?(res.detected||"Detected"):name(from),to});
+    store.set("tr_hist",h.slice(0,8));renderHist();
+  }catch(e){
+    setOut("Translation shows up here",true);
+    if(e&&e.code==="not_granted"){sample=null;setMode();status("Translation was not allowed. Refresh and allow it when asked.")}
+    else if(e&&e.code==="rate_limited")status("Too many translations in a row. Wait a minute and try again.");
+    else if(e&&e.name==="AbortError")status("");
+    else status((e&&e.message)||"Something went wrong. Try again.");
+  }finally{busy=false;$("go").disabled=false;$("go").textContent="Translate"}
+}
+
+function renderHist(){
+  const h=store.get("tr_hist",[]);
+  $("list").innerHTML=h.length?h.map((x,i)=>`<button class="item" data-i="${i}"><div><small>${esc(x.f)}</small><span>${esc(x.s)}</span></div><div><small>${esc(name(x.to))}</small><span>${esc(x.t)}</span></div></button>`).join(""):`<p class="none">Nothing yet. Your last 8 translations will show here.</p>`;
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+
+$("go").addEventListener("click",translate);
+$("src").addEventListener("input",count);
+$("src").addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();translate()}});
+$("from").addEventListener("change",()=>store.set("tr_from",$("from").value));
+$("to").addEventListener("change",()=>store.set("tr_to",$("to").value));
+$("swap").addEventListener("click",()=>{
+  const f=$("from").value,t=$("to").value,o=$("out");
+  if(f!=="auto")$("to").value=f;
+  $("from").value=t;
+  if(!o.classList.contains("empty")){$("src").value=o.textContent;setOut("Translation shows up here",true);count()}
+  store.set("tr_from",$("from").value);store.set("tr_to",$("to").value);
+});
+$("copy").addEventListener("click",async()=>{
+  const o=$("out");if(o.classList.contains("empty")){status("Nothing to copy yet.");return}
+  try{await navigator.clipboard.writeText(o.textContent);status("Copied.");setTimeout(()=>status(""),1500)}
+  catch(e){const r=document.createRange();r.selectNodeContents(o);const s=getSelection();s.removeAllRanges();s.addRange(r);status("Selected. Press Ctrl + C to copy.")}
+});
+$("clear").addEventListener("click",()=>{if(ctrl)ctrl.abort();$("src").value="";setOut("Translation shows up here",true);$("det").textContent="";$("outLang").textContent="";status("");count();$("src").focus()});
+$("list").addEventListener("click",e=>{const b=e.target.closest(".item");if(!b)return;const x=store.get("tr_hist",[])[+b.dataset.i];if(!x)return;$("src").value=x.s;setOut(x.t);$("to").value=x.to;count();window.scrollTo({top:0,behavior:"smooth"})});
+renderHist();count();
+}
+</script>
+</body>
+</html>
